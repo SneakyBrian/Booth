@@ -1,0 +1,26 @@
+﻿@model Booth.Models.BoothModel
+
+@{
+    ViewBag.Title = Model.Name;
+}
+
+<div class="page-header">
+    <h1>@ViewBag.Title</h1>
+</div>
+
+@section scripts {
+<script src="~/signalr/hubs"></script>
+<script>
+    $(function () {
+        var boothHub = $.connection.boothHub;
+
+        boothHub.client.onJoinedBooth = function (userName) {
+            console.log(userName + " joined Booth @Model.Name");
+        };
+
+        $.connection.hub.start().done(function () {
+            boothHub.server.joinBooth("@Model.Name");
+        });
+    });
+</script>
+}

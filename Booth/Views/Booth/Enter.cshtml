@@ -12,15 +12,8 @@
 <script src="~/signalr/hubs"></script>
 <script>
     $(function () {
-        var boothHub = $.connection.boothHub;
-
-        boothHub.client.onJoinedBooth = function (userName) {
-            console.log(userName + " joined Booth @Model.Name");
-        };
-
-        $.connection.hub.start().done(function () {
-            boothHub.server.joinBooth("@Model.Name");
-        });
+        booth.init("@Model.Name");
+        booth.join();
     });
 </script>
 }

@@ -174,7 +174,9 @@
     <Content Include="Content\images\glyphicons-halflings.png" />
     <Content Include="Content\site.css" />
     <Content Include="Global.asax" />
+    <Content Include="Scripts\Booth.Client.js.map" />
     <None Include="Scripts\jquery-2.0.2.intellisense.js" />
+    <Content Include="Scripts\Booth.Client.js" />
     <Content Include="Scripts\bootstrap.js" />
     <Content Include="Scripts\bootstrap.min.js" />
     <Content Include="Scripts\jquery-2.0.2.js" />
@@ -201,6 +203,12 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Booth.Client\Booth.Client.csproj">
+      <Project>{6cc8c2fc-34eb-401b-90b4-d8b0303a7a1e}</Project>
+      <Name>Booth.Client</Name>
+    </ProjectReference>
   </ItemGroup>
   <PropertyGroup>
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">10.0</VisualStudioVersion>

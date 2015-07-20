@@ -26,7 +26,8 @@ namespace Booth
                             .Include("~/Scripts/jquery-{version}.js")
                             .Include("~/Scripts/jquery-ui-{version}.js")
                             .Include("~/Scripts/jquery.signalR-{version}.js")
-                            .Include("~/Scripts/bootstrap.js"));
+                            .Include("~/Scripts/bootstrap.js")
+                            .Include("~/Scripts/Booth.Client.js"));
         }
     }
 }

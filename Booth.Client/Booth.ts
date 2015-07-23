@@ -1,12 +1,21 @@
-﻿module booth {
+﻿/// <reference path="./scripts/typings/jquery/jquery.d.ts" />
+/// <reference path="./scripts/typings/signalr/signalr.d.ts" />
 
-    var client: Client;
+module booth {
+
+    var _client: Client;
+    var _logger: Logger = new Logger();
     
-    export function init(boothName:string){
-        client = new Client(boothName);
-    } 
+    export function onLog(logHandler: (message: string) => void) {
+        _logger.logHandler = logHandler;
+    }
 
-    export function join() {
-        client.join();
+    export function join(boothName: string, connection: SignalR) {
+
+        _client = new Client(boothName, connection);
+
+        _client.logger = _logger;
+
+        _client.join();
     }
 }  

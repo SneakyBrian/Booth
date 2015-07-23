@@ -4,16 +4,37 @@
     ViewBag.Title = Model.Name;
 }
 
+@section styles {
+    <style>
+        #remoteView {
+            height: 320px;
+            width: 320px;
+            float: left;
+        }
+
+        #localView {
+            height: 320px;
+            width: 320px;
+            float: right;
+        }
+    </style>
+}
+
 <div class="page-header">
     <h1>@ViewBag.Title</h1>
+    <video id="remoteView"></video>
+    <video id="localView"></video>
 </div>
 
 @section scripts {
 <script src="~/signalr/hubs"></script>
 <script>
     $(function () {
-        booth.init("@Model.Name");
-        booth.join();
+        booth.onLog(function (message) {
+            //TODO: print out message
+        });
+
+        booth.join("@Model.Name", $.connection);
     });
 </script>
 }

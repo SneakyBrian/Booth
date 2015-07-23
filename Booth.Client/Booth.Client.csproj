@@ -25,9 +25,12 @@
   <ItemGroup>
     <TypeScriptCompile Include="Booth.ts" />
     <TypeScriptCompile Include="Booth\Client.ts" />
+    <TypeScriptCompile Include="Booth\Logger.ts" />
     <TypeScriptCompile Include="Interfaces\HubInterfaces.ts" />
     <TypeScriptCompile Include="Scripts\typings\jquery\jquery.d.ts" />
     <TypeScriptCompile Include="Scripts\typings\signalr\signalr.d.ts" />
+    <TypeScriptCompile Include="Scripts\typings\webrtc\MediaStream.d.ts" />
+    <TypeScriptCompile Include="Scripts\typings\webrtc\RTCPeerConnection.d.ts" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="packages.config" />

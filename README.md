@@ -6,7 +6,7 @@ P2P Micro Chatroom
 
 ## About ##
 
-Booth is a tiny chat room with only room for 2 people. You will be able to video chat, text chat and transfer files. The connections between users will be P2P using WebRTC, so chat data will pass through the server.
+Booth is a tiny chat room with only room for 2 people. You will be able to video chat, text chat and transfer files. The connections between users will be P2P using WebRTC, so no chat data will pass through the server.
 
 ## Development Status ##
 

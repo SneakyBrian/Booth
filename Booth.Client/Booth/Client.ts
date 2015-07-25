@@ -36,7 +36,9 @@ module booth {
 
             this._boothHub.client.onJoinedBooth = (userName) => {
                 this.log(userName + " joined Booth " + this._boothName);
-                this.start(true);
+                if (!this._peerConnection) {
+                    this.start(true);
+                }
             };
 
             this._boothHub.client.onLeftBooth = (userName) => {
@@ -53,15 +55,15 @@ module booth {
                 }
 
                 var signal = JSON.parse(signallingInfo);
-                if (signal.sdp) {
-                    this._peerConnection.setRemoteDescription(new RTCSessionDescription(signal.sdp));
-                } else if (signal.candidate) {
-                    this._peerConnection.addIceCandidate(new RTCIceCandidate(signal.candidate),
+                if (signal && signal.sdp) {
+                    this._peerConnection.setRemoteDescription(new RTCSessionDescription(signal));
+                } else if (signal && signal.candidate) {
+                    this._peerConnection.addIceCandidate(new RTCIceCandidate(signal),
                         () => {
                             this.log("addIceCandidate success");
                         },
-                        () => {
-                            this.log("addIceCandidate fail");
+                        (error: DOMError) => {
+                            this.log("addIceCandidate fail: " + error.toString());
                         });
                 }
             };
@@ -81,6 +83,10 @@ module booth {
             if (this.logger) {
                 this.logger.log(message);
             }
+        }
+
+        private logError(error: Error) {
+            this.log(error.name + " - " + error.message);
         }
 
         private start(caller: boolean) {
@@ -108,55 +114,70 @@ module booth {
 
             this._peerConnection = new webkitRTCPeerConnection(config);
 
-            this._peerConnection.onicecandidate = (evt) => {
+            this._peerConnection.onicecandidate = (evt) => this.onicecandidate(evt);
 
-                var candidateInfo = JSON.stringify({ "candidate": evt.candidate });
+            this._peerConnection.onaddstream = (evt) => this.onaddstream(evt);
+
+            var mediaStreamConstraints: MediaStreamConstraints = { video: true, audio: true };
+
+            navigator.getUserMedia(mediaStreamConstraints,
+                (stream) => this.ongetUserMediaSuccess(stream, caller),
+                this.logError);
+
+        }
+
+        private onicecandidate(evt: RTCIceCandidateEvent) {
+
+            if (evt && evt.candidate) {
+
+                var candidateInfo = JSON.stringify(evt.candidate);
 
                 this.log("onicecandidate " + candidateInfo);
 
                 this._boothHub.server.sendSignallingInfo(candidateInfo);
-            };
+            } else {
+                this.log("onicecandidate - no ice candidate info!");
+            }
+
+        }
+
+        private onaddstream(evt: RTCMediaStreamEvent) {
 
             // once remote stream arrives, show it in the remote video element
-            this._peerConnection.onaddstream = (evt) => {
-                this.log("onaddstream");
 
-                var remoteView: HTMLVideoElement = <HTMLVideoElement>document.getElementById("remoteView");
-                remoteView.src = URL.createObjectURL(evt.stream);
-            };
+            this.log("onaddstream");
+
+            var remoteView: HTMLVideoElement = <HTMLVideoElement>document.getElementById("remoteView");
+            remoteView.src = URL.createObjectURL(evt.stream);
+
+        }
+
+        private ongetUserMediaSuccess(stream: any, caller: boolean) {
 
             // get the local stream, show it in the local video element and send it
 
-            var mediaStreamConstraints: MediaStreamConstraints = { video: true, audio: true };
+            var localView: HTMLVideoElement = <HTMLVideoElement>document.getElementById("localView");
+            localView.src = URL.createObjectURL(stream);
 
-            navigator.getUserMedia(mediaStreamConstraints,(stream) => {
+            this._peerConnection.addStream(stream);
 
-                var localView: HTMLVideoElement = <HTMLVideoElement>document.getElementById("localView");
-                localView.src = URL.createObjectURL(stream);
+            if (caller) {
+                this._peerConnection.createOffer((desc) => this.gotDescription(desc));
+            } else {
+                this._peerConnection.createAnswer((desc) => this.gotDescription(desc));
+            }
 
-                this._peerConnection.addStream(stream);
+        }
 
-                var gotDescription = (desc: any) => {
+        private gotDescription(desc: any) {
 
-                    var descInfo = JSON.stringify({ "sdp": desc });
+            var descInfo = JSON.stringify(desc);
 
-                    this.log("gotDescription " + descInfo);
+            this.log("gotDescription " + descInfo);
 
-                    this._peerConnection.setLocalDescription(desc);
+            this._peerConnection.setLocalDescription(desc);
 
-                    this._boothHub.server.sendSignallingInfo(descInfo);
-                }
-
-                if (caller) {
-                    this._peerConnection.createOffer(gotDescription);
-                } else {
-                    this._peerConnection.createAnswer(gotDescription);
-                }
-
-            },
-            (error) => {
-                this.log(error.name + " - " + error.message);
-            });
+            this._boothHub.server.sendSignallingInfo(descInfo);
 
         }
     }

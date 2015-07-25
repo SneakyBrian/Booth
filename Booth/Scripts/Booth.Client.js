@@ -26,7 +26,9 @@ var booth;
             this._boothHub = this._connection.boothHub;
             this._boothHub.client.onJoinedBooth = function (userName) {
                 _this.log(userName + " joined Booth " + _this._boothName);
-                _this.start(true);
+                if (!_this._peerConnection) {
+                    _this.start(true);
+                }
             };
             this._boothHub.client.onLeftBooth = function (userName) {
                 _this.log(userName + " left Booth " + _this._boothName);
@@ -38,14 +40,14 @@ var booth;
                     _this.start(false);
                 }
                 var signal = JSON.parse(signallingInfo);
-                if (signal.sdp) {
-                    _this._peerConnection.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+                if (signal && signal.sdp) {
+                    _this._peerConnection.setRemoteDescription(new RTCSessionDescription(signal));
                 }
-                else if (signal.candidate) {
-                    _this._peerConnection.addIceCandidate(new RTCIceCandidate(signal.candidate), function () {
+                else if (signal && signal.candidate) {
+                    _this._peerConnection.addIceCandidate(new RTCIceCandidate(signal), function () {
                         _this.log("addIceCandidate success");
-                    }, function () {
-                        _this.log("addIceCandidate fail");
+                    }, function (error) {
+                        _this.log("addIceCandidate fail: " + error.toString());
                     });
                 }
             };
@@ -61,6 +63,9 @@ var booth;
             if (this.logger) {
                 this.logger.log(message);
             }
+        };
+        Client.prototype.logError = function (error) {
+            this.log(error.name + " - " + error.message);
         };
         Client.prototype.start = function (caller) {
             var _this = this;
@@ -85,38 +90,45 @@ var booth;
                 ]
             };
             this._peerConnection = new webkitRTCPeerConnection(config);
-            this._peerConnection.onicecandidate = function (evt) {
-                var candidateInfo = JSON.stringify({ "candidate": evt.candidate });
-                _this.log("onicecandidate " + candidateInfo);
-                _this._boothHub.server.sendSignallingInfo(candidateInfo);
-            };
-            // once remote stream arrives, show it in the remote video element
-            this._peerConnection.onaddstream = function (evt) {
-                _this.log("onaddstream");
-                var remoteView = document.getElementById("remoteView");
-                remoteView.src = URL.createObjectURL(evt.stream);
-            };
-            // get the local stream, show it in the local video element and send it
+            this._peerConnection.onicecandidate = function (evt) { return _this.onicecandidate(evt); };
+            this._peerConnection.onaddstream = function (evt) { return _this.onaddstream(evt); };
             var mediaStreamConstraints = { video: true, audio: true };
-            navigator.getUserMedia(mediaStreamConstraints, function (stream) {
-                var localView = document.getElementById("localView");
-                localView.src = URL.createObjectURL(stream);
-                _this._peerConnection.addStream(stream);
-                var gotDescription = function (desc) {
-                    var descInfo = JSON.stringify({ "sdp": desc });
-                    _this.log("gotDescription " + descInfo);
-                    _this._peerConnection.setLocalDescription(desc);
-                    _this._boothHub.server.sendSignallingInfo(descInfo);
-                };
-                if (caller) {
-                    _this._peerConnection.createOffer(gotDescription);
-                }
-                else {
-                    _this._peerConnection.createAnswer(gotDescription);
-                }
-            }, function (error) {
-                _this.log(error.name + " - " + error.message);
-            });
+            navigator.getUserMedia(mediaStreamConstraints, function (stream) { return _this.ongetUserMediaSuccess(stream, caller); }, this.logError);
+        };
+        Client.prototype.onicecandidate = function (evt) {
+            if (evt && evt.candidate) {
+                var candidateInfo = JSON.stringify(evt.candidate);
+                this.log("onicecandidate " + candidateInfo);
+                this._boothHub.server.sendSignallingInfo(candidateInfo);
+            }
+            else {
+                this.log("onicecandidate - no ice candidate info!");
+            }
+        };
+        Client.prototype.onaddstream = function (evt) {
+            // once remote stream arrives, show it in the remote video element
+            this.log("onaddstream");
+            var remoteView = document.getElementById("remoteView");
+            remoteView.src = URL.createObjectURL(evt.stream);
+        };
+        Client.prototype.ongetUserMediaSuccess = function (stream, caller) {
+            // get the local stream, show it in the local video element and send it
+            var _this = this;
+            var localView = document.getElementById("localView");
+            localView.src = URL.createObjectURL(stream);
+            this._peerConnection.addStream(stream);
+            if (caller) {
+                this._peerConnection.createOffer(function (desc) { return _this.gotDescription(desc); });
+            }
+            else {
+                this._peerConnection.createAnswer(function (desc) { return _this.gotDescription(desc); });
+            }
+        };
+        Client.prototype.gotDescription = function (desc) {
+            var descInfo = JSON.stringify(desc);
+            this.log("gotDescription " + descInfo);
+            this._peerConnection.setLocalDescription(desc);
+            this._boothHub.server.sendSignallingInfo(descInfo);
         };
         return Client;
     })();

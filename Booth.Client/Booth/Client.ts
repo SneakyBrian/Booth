@@ -85,13 +85,36 @@ module booth {
 
         private start(caller: boolean) {
 
-            var config: RTCPeerConnectionConfig = { iceServers: [] };
+            var config: RTCPeerConnectionConfig = {
+                'iceServers': [
+                    {
+                        'url': 'stun:stun.l.google.com:19302'
+                    },
+                    {
+                        'url': 'stun:global.stun.twilio.com:3478?transport=udp'
+                    },
+                    {
+                        'url': 'turn:192.158.29.39:3478?transport=udp',
+                        'credential': 'JZEOEt2V3Qb0y27GRntt2u2PAYA=',
+                        'username': '28224511:1379330808'
+                    },
+                    {
+                        'url': 'turn:192.158.29.39:3478?transport=tcp',
+                        'credential': 'JZEOEt2V3Qb0y27GRntt2u2PAYA=',
+                        'username': '28224511:1379330808'
+                    }
+                ]
+            };
 
             this._peerConnection = new webkitRTCPeerConnection(config);
 
             this._peerConnection.onicecandidate = (evt) => {
-                this.log("onicecandidate " + evt.candidate);
-                this._boothHub.server.sendSignallingInfo(JSON.stringify({ "candidate": evt.candidate }));
+
+                var candidateInfo = JSON.stringify({ "candidate": evt.candidate });
+
+                this.log("onicecandidate " + candidateInfo);
+
+                this._boothHub.server.sendSignallingInfo(candidateInfo);
             };
 
             // once remote stream arrives, show it in the remote video element
@@ -114,9 +137,14 @@ module booth {
                 this._peerConnection.addStream(stream);
 
                 var gotDescription = (desc: any) => {
-                    this.log("gotDescription");
+
+                    var descInfo = JSON.stringify({ "sdp": desc });
+
+                    this.log("gotDescription " + descInfo);
+
                     this._peerConnection.setLocalDescription(desc);
-                    this._boothHub.server.sendSignallingInfo(JSON.stringify({ "sdp": desc }));
+
+                    this._boothHub.server.sendSignallingInfo(descInfo);
                 }
 
                 if (caller) {

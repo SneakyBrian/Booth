@@ -64,11 +64,31 @@ var booth;
         };
         Client.prototype.start = function (caller) {
             var _this = this;
-            var config = { iceServers: [] };
+            var config = {
+                'iceServers': [
+                    {
+                        'url': 'stun:stun.l.google.com:19302'
+                    },
+                    {
+                        'url': 'stun:global.stun.twilio.com:3478?transport=udp'
+                    },
+                    {
+                        'url': 'turn:192.158.29.39:3478?transport=udp',
+                        'credential': 'JZEOEt2V3Qb0y27GRntt2u2PAYA=',
+                        'username': '28224511:1379330808'
+                    },
+                    {
+                        'url': 'turn:192.158.29.39:3478?transport=tcp',
+                        'credential': 'JZEOEt2V3Qb0y27GRntt2u2PAYA=',
+                        'username': '28224511:1379330808'
+                    }
+                ]
+            };
             this._peerConnection = new webkitRTCPeerConnection(config);
             this._peerConnection.onicecandidate = function (evt) {
-                _this.log("onicecandidate " + evt.candidate);
-                _this._boothHub.server.sendSignallingInfo(JSON.stringify({ "candidate": evt.candidate }));
+                var candidateInfo = JSON.stringify({ "candidate": evt.candidate });
+                _this.log("onicecandidate " + candidateInfo);
+                _this._boothHub.server.sendSignallingInfo(candidateInfo);
             };
             // once remote stream arrives, show it in the remote video element
             this._peerConnection.onaddstream = function (evt) {
@@ -83,9 +103,10 @@ var booth;
                 localView.src = URL.createObjectURL(stream);
                 _this._peerConnection.addStream(stream);
                 var gotDescription = function (desc) {
-                    _this.log("gotDescription");
+                    var descInfo = JSON.stringify({ "sdp": desc });
+                    _this.log("gotDescription " + descInfo);
                     _this._peerConnection.setLocalDescription(desc);
-                    _this._boothHub.server.sendSignallingInfo(JSON.stringify({ "sdp": desc }));
+                    _this._boothHub.server.sendSignallingInfo(descInfo);
                 };
                 if (caller) {
                     _this._peerConnection.createOffer(gotDescription);

@@ -14,7 +14,30 @@ module booth {
         private _connection: SignalR;
         private _peerConnection: RTCPeerConnection;
 
+        
+        private static _peerConnectionConfig: RTCPeerConnectionConfig = {
+            'iceServers': [
+                {
+                    'url': 'stun:stun.l.google.com:19302'
+                },
+                {
+                    'url': 'stun:global.stun.twilio.com:3478?transport=udp'
+                },
+                {
+                    'url': 'turn:192.158.29.39:3478?transport=udp',
+                    'credential': 'JZEOEt2V3Qb0y27GRntt2u2PAYA=',
+                    'username': '28224511:1379330808'
+                },
+                {
+                    'url': 'turn:192.158.29.39:3478?transport=tcp',
+                    'credential': 'JZEOEt2V3Qb0y27GRntt2u2PAYA=',
+                    'username': '28224511:1379330808'
+                }
+            ]
+        };
+
         constructor(boothName: string, connection: SignalR) {
+            
             this._boothName = boothName;
             this._connection = connection;
 
@@ -91,28 +114,7 @@ module booth {
 
         private start(caller: boolean) {
 
-            var config: RTCPeerConnectionConfig = {
-                'iceServers': [
-                    {
-                        'url': 'stun:stun.l.google.com:19302'
-                    },
-                    {
-                        'url': 'stun:global.stun.twilio.com:3478?transport=udp'
-                    },
-                    {
-                        'url': 'turn:192.158.29.39:3478?transport=udp',
-                        'credential': 'JZEOEt2V3Qb0y27GRntt2u2PAYA=',
-                        'username': '28224511:1379330808'
-                    },
-                    {
-                        'url': 'turn:192.158.29.39:3478?transport=tcp',
-                        'credential': 'JZEOEt2V3Qb0y27GRntt2u2PAYA=',
-                        'username': '28224511:1379330808'
-                    }
-                ]
-            };
-
-            this._peerConnection = new webkitRTCPeerConnection(config);
+            this._peerConnection = new webkitRTCPeerConnection(Client._peerConnectionConfig);
 
             this._peerConnection.onicecandidate = (evt) => this.onicecandidate(evt);
 

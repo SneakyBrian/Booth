@@ -69,27 +69,7 @@ var booth;
         };
         Client.prototype.start = function (caller) {
             var _this = this;
-            var config = {
-                'iceServers': [
-                    {
-                        'url': 'stun:stun.l.google.com:19302'
-                    },
-                    {
-                        'url': 'stun:global.stun.twilio.com:3478?transport=udp'
-                    },
-                    {
-                        'url': 'turn:192.158.29.39:3478?transport=udp',
-                        'credential': 'JZEOEt2V3Qb0y27GRntt2u2PAYA=',
-                        'username': '28224511:1379330808'
-                    },
-                    {
-                        'url': 'turn:192.158.29.39:3478?transport=tcp',
-                        'credential': 'JZEOEt2V3Qb0y27GRntt2u2PAYA=',
-                        'username': '28224511:1379330808'
-                    }
-                ]
-            };
-            this._peerConnection = new webkitRTCPeerConnection(config);
+            this._peerConnection = new webkitRTCPeerConnection(Client._peerConnectionConfig);
             this._peerConnection.onicecandidate = function (evt) { return _this.onicecandidate(evt); };
             this._peerConnection.onaddstream = function (evt) { return _this.onaddstream(evt); };
             var mediaStreamConstraints = { video: true, audio: true };
@@ -129,6 +109,26 @@ var booth;
             this.log("gotDescription " + descInfo);
             this._peerConnection.setLocalDescription(desc);
             this._boothHub.server.sendSignallingInfo(descInfo);
+        };
+        Client._peerConnectionConfig = {
+            'iceServers': [
+                {
+                    'url': 'stun:stun.l.google.com:19302'
+                },
+                {
+                    'url': 'stun:global.stun.twilio.com:3478?transport=udp'
+                },
+                {
+                    'url': 'turn:192.158.29.39:3478?transport=udp',
+                    'credential': 'JZEOEt2V3Qb0y27GRntt2u2PAYA=',
+                    'username': '28224511:1379330808'
+                },
+                {
+                    'url': 'turn:192.158.29.39:3478?transport=tcp',
+                    'credential': 'JZEOEt2V3Qb0y27GRntt2u2PAYA=',
+                    'username': '28224511:1379330808'
+                }
+            ]
         };
         return Client;
     })();

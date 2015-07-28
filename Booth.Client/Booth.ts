@@ -10,6 +10,13 @@ module booth {
         _logger.logHandler = logHandler;
     }
 
+    export function onMessage(messageHandler: (message: string) => void) {
+
+        if (_client) {
+            _client.onmessage = messageHandler;
+        }
+    }
+
     export function join(boothName: string, connection: SignalR) {
 
         _client = new Client(boothName, connection);
@@ -17,5 +24,12 @@ module booth {
         _client.logger = _logger;
 
         _client.join();
+    }
+
+    export function sendMessage(message: string) {
+
+        if (_client) {
+            _client.send(message);
+        }
     }
 }  

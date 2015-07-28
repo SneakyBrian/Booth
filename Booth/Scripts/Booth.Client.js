@@ -35,7 +35,7 @@ var booth;
                 _this._peerConnection.close();
             };
             this._boothHub.client.onSignallingInfoRecieved = function (userName, signallingInfo) {
-                _this.log(userName + " sent signalling info: " + signallingInfo);
+                //this.log(userName + " sent signalling info: " + signallingInfo);
                 if (!_this._peerConnection) {
                     _this.start(false);
                 }
@@ -59,6 +59,11 @@ var booth;
             this._boothHub.server.leaveBooth(this._boothName);
             this._peerConnection.close();
         };
+        Client.prototype.send = function (message) {
+            this._sendChannel.send(message);
+            this.log("sent message: " + message);
+        };
+        //PRIVATE 
         Client.prototype.log = function (message) {
             if (this.logger) {
                 this.logger.log(message);
@@ -69,16 +74,48 @@ var booth;
         };
         Client.prototype.start = function (caller) {
             var _this = this;
-            this._peerConnection = new webkitRTCPeerConnection(Client._peerConnectionConfig);
-            this._peerConnection.onicecandidate = function (evt) { return _this.onicecandidate(evt); };
-            this._peerConnection.onaddstream = function (evt) { return _this.onaddstream(evt); };
+            this.log("booth client starting - caller: " + caller);
+            var peerConnection = this._peerConnection = new webkitRTCPeerConnection(Client._peerConnectionConfig, {
+                optional: [{
+                    RtpDataChannels: true
+                }]
+            });
+            peerConnection.onicecandidate = function (evt) { return _this.onicecandidate(evt); };
+            peerConnection.ondatachannel = function (evt) { return _this.ondatachannel(evt); };
+            var sendChannel = this._sendChannel = peerConnection.createDataChannel('sendDataChannel', {
+                reliable: false
+            });
+            //TODO
+            sendChannel.onopen = function (evt) { return _this.onChannelStateChange(evt, sendChannel); };
+            sendChannel.onclose = function (evt) { return _this.onChannelStateChange(evt, sendChannel); };
+            sendChannel.onerror = function (evt) { return _this.log("send channel error: " + evt.type); };
+            peerConnection.onaddstream = function (evt) { return _this.onaddstream(evt); };
             var mediaStreamConstraints = { video: true, audio: true };
             navigator.getUserMedia(mediaStreamConstraints, function (stream) { return _this.ongetUserMediaSuccess(stream, caller); }, this.logError);
+        };
+        Client.prototype.ondatachannel = function (evt) {
+            var _this = this;
+            this.log("got receive data channel");
+            var receiveChannel = this._receiveChannel = evt.channel;
+            receiveChannel.onmessage = function (evt) { return _this.onReceiveMessage(event.data); };
+            receiveChannel.onopen = function (evt) { return _this.onChannelStateChange(evt, receiveChannel); };
+            receiveChannel.onclose = function (evt) { return _this.onChannelStateChange(evt, receiveChannel); };
+            receiveChannel.onerror = function (evt) { return _this.log("receive channel error: " + evt.type); };
+        };
+        Client.prototype.onChannelStateChange = function (evt, channel) {
+            var channelName = channel === this._sendChannel ? "send" : "receive";
+            this.log(channelName + " channel state is " + channel.readyState);
+        };
+        Client.prototype.onReceiveMessage = function (message) {
+            if (this.onmessage) {
+                this.onmessage(message);
+            }
+            this.log("got message: " + message);
         };
         Client.prototype.onicecandidate = function (evt) {
             if (evt && evt.candidate) {
                 var candidateInfo = JSON.stringify(evt.candidate);
-                this.log("onicecandidate " + candidateInfo);
+                //this.log("onicecandidate " + candidateInfo);
                 this._boothHub.server.sendSignallingInfo(candidateInfo);
             }
             else {
@@ -106,7 +143,7 @@ var booth;
         };
         Client.prototype.gotDescription = function (desc) {
             var descInfo = JSON.stringify(desc);
-            this.log("gotDescription " + descInfo);
+            //this.log("gotDescription " + descInfo);
             this._peerConnection.setLocalDescription(desc);
             this._boothHub.server.sendSignallingInfo(descInfo);
         };
@@ -169,11 +206,23 @@ var booth;
         _logger.logHandler = logHandler;
     }
     booth.onLog = onLog;
+    function onMessage(messageHandler) {
+        if (_client) {
+            _client.onmessage = messageHandler;
+        }
+    }
+    booth.onMessage = onMessage;
     function join(boothName, connection) {
         _client = new booth.Client(boothName, connection);
         _client.logger = _logger;
         _client.join();
     }
     booth.join = join;
+    function sendMessage(message) {
+        if (_client) {
+            _client.send(message);
+        }
+    }
+    booth.sendMessage = sendMessage;
 })(booth || (booth = {}));
 //# sourceMappingURL=Booth.Client.js.map

@@ -13,6 +13,8 @@ module booth {
         private _logger: Logger;
         private _connection: SignalR;
         private _peerConnection: RTCPeerConnection;
+        private _sendChannel: RTCDataChannel;
+        private _receiveChannel: RTCDataChannel;
 
         
         private static _peerConnectionConfig: RTCPeerConnectionConfig = {
@@ -35,6 +37,8 @@ module booth {
                 }
             ]
         };
+
+        public onmessage: (message: string) => void;
 
         constructor(boothName: string, connection: SignalR) {
             
@@ -71,7 +75,7 @@ module booth {
 
             this._boothHub.client.onSignallingInfoRecieved = (userName, signallingInfo) => {
                 
-                this.log(userName + " sent signalling info: " + signallingInfo);
+                //this.log(userName + " sent signalling info: " + signallingInfo);
 
                 if (!this._peerConnection) {
                     this.start(false);
@@ -102,6 +106,15 @@ module booth {
             this._peerConnection.close();
         }
 
+
+        public send(message: string) {
+            this._sendChannel.send(message);
+            this.log("sent message: " + message);
+        }
+
+
+        //PRIVATE 
+
         private log(message: string) {
             if (this.logger) {
                 this.logger.log(message);
@@ -114,11 +127,28 @@ module booth {
 
         private start(caller: boolean) {
 
-            this._peerConnection = new webkitRTCPeerConnection(Client._peerConnectionConfig);
+            this.log("booth client starting - caller: " + caller);
 
-            this._peerConnection.onicecandidate = (evt) => this.onicecandidate(evt);
+            var peerConnection = this._peerConnection = new webkitRTCPeerConnection(Client._peerConnectionConfig, {
+                optional: [{
+                    RtpDataChannels: true
+                }]
+            });
 
-            this._peerConnection.onaddstream = (evt) => this.onaddstream(evt);
+            peerConnection.onicecandidate = (evt) => this.onicecandidate(evt);
+            peerConnection.ondatachannel = (evt) => this.ondatachannel(<RTCDataChannelEvent>evt);
+
+            var sendChannel = this._sendChannel = peerConnection.createDataChannel('sendDataChannel', {
+                reliable: false
+            });
+
+
+            //TODO
+            sendChannel.onopen = (evt) => this.onChannelStateChange(evt, sendChannel);
+            sendChannel.onclose = (evt) => this.onChannelStateChange(evt, sendChannel);
+            sendChannel.onerror = (evt) => this.log("send channel error: " + evt.type);
+
+            peerConnection.onaddstream = (evt) => this.onaddstream(evt);
 
             var mediaStreamConstraints: MediaStreamConstraints = { video: true, audio: true };
 
@@ -128,13 +158,40 @@ module booth {
 
         }
 
+        private ondatachannel(evt: RTCDataChannelEvent) {
+
+            this.log("got receive data channel");
+
+            var receiveChannel = this._receiveChannel = evt.channel;
+            receiveChannel.onmessage = (evt) => this.onReceiveMessage(event.data);
+            receiveChannel.onopen = (evt) => this.onChannelStateChange(evt, receiveChannel);
+            receiveChannel.onclose = (evt) => this.onChannelStateChange(evt, receiveChannel);
+            receiveChannel.onerror = (evt) => this.log("receive channel error: " + evt.type);
+        }
+
+        private onChannelStateChange(evt: Event, channel: RTCDataChannel) {
+
+            var channelName = channel === this._sendChannel ? "send" : "receive";
+
+            this.log(channelName + " channel state is " + channel.readyState);
+
+        }
+
+        private onReceiveMessage(message: string) {
+            if (this.onmessage) {
+                this.onmessage(message);
+            }
+
+            this.log("got message: " + message);
+        }
+
         private onicecandidate(evt: RTCIceCandidateEvent) {
 
             if (evt && evt.candidate) {
 
                 var candidateInfo = JSON.stringify(evt.candidate);
 
-                this.log("onicecandidate " + candidateInfo);
+                //this.log("onicecandidate " + candidateInfo);
 
                 this._boothHub.server.sendSignallingInfo(candidateInfo);
             } else {
@@ -175,7 +232,7 @@ module booth {
 
             var descInfo = JSON.stringify(desc);
 
-            this.log("gotDescription " + descInfo);
+            //this.log("gotDescription " + descInfo);
 
             this._peerConnection.setLocalDescription(desc);
 

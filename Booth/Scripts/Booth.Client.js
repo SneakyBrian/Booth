@@ -36,14 +36,26 @@ var booth;
             };
             this._boothHub.client.onSignallingInfoRecieved = function (userName, signallingInfo) {
                 //this.log(userName + " sent signalling info: " + signallingInfo);
+                _this.log(userName + " sent signalling info");
+                var caller = true;
                 if (!_this._peerConnection) {
-                    _this.start(false);
+                    caller = false;
+                    _this.start(caller);
                 }
                 var signal = JSON.parse(signallingInfo);
                 if (signal && signal.sdp) {
-                    _this._peerConnection.setRemoteDescription(new RTCSessionDescription(signal));
+                    _this.log(userName + " sent remote description");
+                    _this._peerConnection.setRemoteDescription(new RTCSessionDescription(signal), function () {
+                        _this.log("setRemoteDescription success");
+                        if (!caller) {
+                            _this._peerConnection.createAnswer(function (desc) { return _this.gotAnswer(desc); }, function (error) { return _this.log("peerConnection createAnswer error: " + error.toString()); });
+                        }
+                    }, function (error) {
+                        _this.log("setRemoteDescription fail: " + error.toString());
+                    });
                 }
                 else if (signal && signal.candidate) {
+                    _this.log(userName + " sent ice candidate");
                     _this._peerConnection.addIceCandidate(new RTCIceCandidate(signal), function () {
                         _this.log("addIceCandidate success");
                     }, function (error) {
@@ -62,6 +74,11 @@ var booth;
         Client.prototype.send = function (message) {
             this._sendChannel.send(message);
             this.log("sent message: " + message);
+        };
+        Client.prototype.sendVideo = function () {
+            var _this = this;
+            var mediaStreamConstraints = { video: true, audio: true };
+            navigator.getUserMedia(mediaStreamConstraints, function (stream) { return _this.ongetUserMediaSuccess(stream); }, this.logError);
         };
         //PRIVATE 
         Client.prototype.log = function (message) {
@@ -83,15 +100,16 @@ var booth;
             peerConnection.onicecandidate = function (evt) { return _this.onicecandidate(evt); };
             peerConnection.ondatachannel = function (evt) { return _this.ondatachannel(evt); };
             var sendChannel = this._sendChannel = peerConnection.createDataChannel('sendDataChannel', {
-                reliable: false
+                reliable: true
             });
             //TODO
             sendChannel.onopen = function (evt) { return _this.onChannelStateChange(evt, sendChannel); };
             sendChannel.onclose = function (evt) { return _this.onChannelStateChange(evt, sendChannel); };
             sendChannel.onerror = function (evt) { return _this.log("send channel error: " + evt.type); };
             peerConnection.onaddstream = function (evt) { return _this.onaddstream(evt); };
-            var mediaStreamConstraints = { video: true, audio: true };
-            navigator.getUserMedia(mediaStreamConstraints, function (stream) { return _this.ongetUserMediaSuccess(stream, caller); }, this.logError);
+            if (caller) {
+                peerConnection.createOffer(function (desc) { return _this.gotOffer(desc); }, function (error) { return _this.log("peerConnection createOffer error: " + error.toString()); });
+            }
         };
         Client.prototype.ondatachannel = function (evt) {
             var _this = this;
@@ -113,13 +131,15 @@ var booth;
             this.log("got message: " + message);
         };
         Client.prototype.onicecandidate = function (evt) {
+            //this.log("onicecandidate");
             if (evt && evt.candidate) {
                 var candidateInfo = JSON.stringify(evt.candidate);
                 //this.log("onicecandidate " + candidateInfo);
+                this.log("sending ice candidate info");
                 this._boothHub.server.sendSignallingInfo(candidateInfo);
             }
             else {
-                this.log("onicecandidate - no ice candidate info!");
+                this.log("no ice candidate info to send");
             }
         };
         Client.prototype.onaddstream = function (evt) {
@@ -128,23 +148,29 @@ var booth;
             var remoteView = document.getElementById("remoteView");
             remoteView.src = URL.createObjectURL(evt.stream);
         };
-        Client.prototype.ongetUserMediaSuccess = function (stream, caller) {
+        Client.prototype.ongetUserMediaSuccess = function (stream) {
             // get the local stream, show it in the local video element and send it
             var _this = this;
+            this.log("ongetUserMediaSuccess");
             var localView = document.getElementById("localView");
             localView.src = URL.createObjectURL(stream);
             this._peerConnection.addStream(stream);
-            if (caller) {
-                this._peerConnection.createOffer(function (desc) { return _this.gotDescription(desc); });
-            }
-            else {
-                this._peerConnection.createAnswer(function (desc) { return _this.gotDescription(desc); });
-            }
+            this._peerConnection.createOffer(function (desc) { return _this.gotOffer(desc); }, function (error) { return _this.log("peerConnection createOffer error: " + error.toString()); });
         };
-        Client.prototype.gotDescription = function (desc) {
+        Client.prototype.gotOffer = function (desc) {
+            var _this = this;
             var descInfo = JSON.stringify(desc);
             //this.log("gotDescription " + descInfo);
-            this._peerConnection.setLocalDescription(desc);
+            this._peerConnection.setLocalDescription(desc, function () { return _this.log("setLocalDescription success"); }, function (error) { return _this.log("setLocalDescription error: " + error.toString()); });
+            this.log("gotOffer - sending description info");
+            this._boothHub.server.sendSignallingInfo(descInfo);
+        };
+        Client.prototype.gotAnswer = function (desc) {
+            var _this = this;
+            var descInfo = JSON.stringify(desc);
+            //this.log("gotDescription " + descInfo);
+            this._peerConnection.setLocalDescription(desc, function () { return _this.log("setLocalDescription success"); }, function (error) { return _this.log("setLocalDescription error: " + error.toString()); });
+            this.log("gotAnswer - sending description info");
             this._boothHub.server.sendSignallingInfo(descInfo);
         };
         Client._peerConnectionConfig = {
@@ -224,5 +250,11 @@ var booth;
         }
     }
     booth.sendMessage = sendMessage;
+    function sendVideo() {
+        if (_client) {
+            _client.sendVideo();
+        }
+    }
+    booth.sendVideo = sendVideo;
 })(booth || (booth = {}));
 //# sourceMappingURL=Booth.Client.js.map

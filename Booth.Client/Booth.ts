@@ -32,4 +32,11 @@ module booth {
             _client.send(message);
         }
     }
+
+    export function sendVideo() {
+
+        if (_client) {
+            _client.sendVideo();
+        }
+    }
 }  

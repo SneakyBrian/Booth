@@ -76,15 +76,36 @@ module booth {
             this._boothHub.client.onSignallingInfoRecieved = (userName, signallingInfo) => {
                 
                 //this.log(userName + " sent signalling info: " + signallingInfo);
+                this.log(userName + " sent signalling info");
+
+                var caller = true;
 
                 if (!this._peerConnection) {
-                    this.start(false);
+                    caller = false;
+                    this.start(caller);
                 }
 
                 var signal = JSON.parse(signallingInfo);
                 if (signal && signal.sdp) {
-                    this._peerConnection.setRemoteDescription(new RTCSessionDescription(signal));
+
+                    this.log(userName + " sent remote description");
+                    this._peerConnection.setRemoteDescription(new RTCSessionDescription(signal),
+                        () => {
+                            this.log("setRemoteDescription success");
+
+                            if (!caller) {
+                                this._peerConnection.createAnswer((desc) => this.gotAnswer(desc),
+                                    (error: DOMError) => this.log("peerConnection createAnswer error: " + error.toString()));
+                            }
+
+                        },
+                        (error: DOMError) => {
+                            this.log("setRemoteDescription fail: " + error.toString());
+                        });
+
                 } else if (signal && signal.candidate) {
+
+                    this.log(userName + " sent ice candidate");
                     this._peerConnection.addIceCandidate(new RTCIceCandidate(signal),
                         () => {
                             this.log("addIceCandidate success");
@@ -112,6 +133,13 @@ module booth {
             this.log("sent message: " + message);
         }
 
+        public sendVideo() {
+            var mediaStreamConstraints: MediaStreamConstraints = { video: true, audio: true };
+
+            navigator.getUserMedia(mediaStreamConstraints,
+                (stream) => this.ongetUserMediaSuccess(stream),
+                this.logError);
+        }
 
         //PRIVATE 
 
@@ -139,7 +167,7 @@ module booth {
             peerConnection.ondatachannel = (evt) => this.ondatachannel(<RTCDataChannelEvent>evt);
 
             var sendChannel = this._sendChannel = peerConnection.createDataChannel('sendDataChannel', {
-                reliable: false
+                reliable: true
             });
 
 
@@ -150,12 +178,10 @@ module booth {
 
             peerConnection.onaddstream = (evt) => this.onaddstream(evt);
 
-            var mediaStreamConstraints: MediaStreamConstraints = { video: true, audio: true };
-
-            navigator.getUserMedia(mediaStreamConstraints,
-                (stream) => this.ongetUserMediaSuccess(stream, caller),
-                this.logError);
-
+            if (caller) {
+                peerConnection.createOffer((desc) => this.gotOffer(desc),
+                    (error: DOMError) => this.log("peerConnection createOffer error: " + error.toString()));
+            }
         }
 
         private ondatachannel(evt: RTCDataChannelEvent) {
@@ -187,15 +213,19 @@ module booth {
 
         private onicecandidate(evt: RTCIceCandidateEvent) {
 
+            //this.log("onicecandidate");
+
             if (evt && evt.candidate) {
 
                 var candidateInfo = JSON.stringify(evt.candidate);
 
                 //this.log("onicecandidate " + candidateInfo);
 
+                this.log("sending ice candidate info");
+                
                 this._boothHub.server.sendSignallingInfo(candidateInfo);
             } else {
-                this.log("onicecandidate - no ice candidate info!");
+                this.log("no ice candidate info to send");
             }
 
         }
@@ -211,30 +241,48 @@ module booth {
 
         }
 
-        private ongetUserMediaSuccess(stream: any, caller: boolean) {
+        private ongetUserMediaSuccess(stream: any) {
 
             // get the local stream, show it in the local video element and send it
+
+            this.log("ongetUserMediaSuccess");
 
             var localView: HTMLVideoElement = <HTMLVideoElement>document.getElementById("localView");
             localView.src = URL.createObjectURL(stream);
 
             this._peerConnection.addStream(stream);
 
-            if (caller) {
-                this._peerConnection.createOffer((desc) => this.gotDescription(desc));
-            } else {
-                this._peerConnection.createAnswer((desc) => this.gotDescription(desc));
-            }
-
+            this._peerConnection.createOffer((desc) => this.gotOffer(desc),
+                (error: DOMError) => this.log("peerConnection createOffer error: " + error.toString()));
         }
 
-        private gotDescription(desc: any) {
+        private gotOffer(desc: any) {
 
             var descInfo = JSON.stringify(desc);
 
             //this.log("gotDescription " + descInfo);
 
-            this._peerConnection.setLocalDescription(desc);
+            this._peerConnection.setLocalDescription(desc,
+                () => this.log("setLocalDescription success"),
+                (error: DOMError) => this.log("setLocalDescription error: " + error.toString()));
+
+            this.log("gotOffer - sending description info");
+
+            this._boothHub.server.sendSignallingInfo(descInfo);
+
+        }
+
+        private gotAnswer(desc: any) {
+
+            var descInfo = JSON.stringify(desc);
+
+            //this.log("gotDescription " + descInfo);
+
+            this._peerConnection.setLocalDescription(desc,
+                () => this.log("setLocalDescription success"),
+                (error: DOMError) => this.log("setLocalDescription error: " + error.toString()));
+
+            this.log("gotAnswer - sending description info");
 
             this._boothHub.server.sendSignallingInfo(descInfo);
 
